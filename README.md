@@ -1,4 +1,4 @@
-# hk-medium-gitlab-part-1
+# hk-medium-gitlab-part-2
 
 ## Medium Article Link
 
