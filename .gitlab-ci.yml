@@ -1,0 +1,64 @@
+stages:
+  - build
+  - test
+  - image
+  - test image
+
+variables:
+  IMAGE_NAME: helloworld
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  REGISTRY_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/$IMAGE_NAME:$IMAGE_TAG
+  CONTAINER_NAME: helloworld
+
+main build:
+  stage: build
+  only:
+    - main
+  image: maven:3.8.3-openjdk-17
+  script:
+    - mvn clean package
+    - cp target/*.jar app.jar
+  artifacts:
+    paths:
+      - app.jar
+
+test build:
+  stage: test
+  only:
+    - main
+  image: maven:3.8.3-openjdk-17
+  script:
+    - java -jar app.jar &
+    - sleep 20
+    - curl --fail "http://localhost:8080/actuator/health"
+
+build and push image:
+  stage: image
+  only:
+    - main
+  image: docker
+  services:
+    - docker:dind
+  before_script:
+    - docker --version
+    - echo $CI_JOB_TOKEN | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+  script:
+    - docker build -t $REGISTRY_IMAGE .
+    - docker push $REGISTRY_IMAGE
+
+test image:
+  stage: test image
+  only:
+    - main
+  image: docker
+  services:
+    - docker:dind
+  before_script:
+    - docker --version
+    - echo $CI_JOB_TOKEN | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+    - apk add curl
+  script:
+    - docker pull $REGISTRY_IMAGE
+    - docker run -d --name $CONTAINER_NAME -p 8080:8080 $REGISTRY_IMAGE
+    - sleep 20
+    - curl -v --fail "http://docker:8080/actuator/health"
